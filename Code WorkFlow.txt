@@ -1,0 +1,75 @@
+   @RequestMapping(value = "/refreshtoken", method = RequestMethod.GET)
+    	public ResponseEntity<?> refreshtoken(HttpServletRequest request) throws Exception {
+    		// From the HttpRequest get the claims
+        	System.out.println("Request value " +request);
+    		DefaultClaims claims = (io.jsonwebtoken.impl.DefaultClaims) request.getAttribute("claims");
+
+    		Map<String, Object> expectedMap = getMapFromIoJsonwebtokenClaims(claims);
+    		String token = jwtService.doGenerateRefreshToken(expectedMap, expectedMap.get("sub").toString());
+    		
+			System.out.println(token);
+    		return ResponseEntity.ok(null);
+    	}
+
+
+
+//        @PostMapping("/refreshToken")
+//        public JwtResponse refreshToken(@RequestBody RefreshTokenRequest refreshTokenRequest) {
+//            JwtResponse jwtResponse = new JwtResponse();
+//            System.out.println("Inside refreshTokenS");
+//            System.out.println(refreshTokenRequest.getTokenUniqueId());
+//            return refreshTokenService.findByToken(refreshTokenRequest.getTokenUniqueId())
+////                    .map(refreshTokenService::verifyExpiration)
+//                    .map(RefreshToken::getPassword)
+//                    .map(userInfo -> {
+//                    	System.out.println("userInfo Object");
+//                    	System.out.println(userInfo);
+//                        String accessToken = jwtService.generateToken(userInfo.getUsername());
+//                        jwtResponse.setAccessToken(accessToken);
+//                        jwtResponse.setToken(refreshTokenRequest.getTokenUniqueId());
+//                        return jwtResponse; // Return JwtResponse here
+//                    })
+//                    .orElseThrow(() -> new RuntimeException("Refresh token is not in database!"));
+//        }
+
+
+
+app-status-filter
+
+
+  public boolean validateToken(String token) throws ExpiredJwtException {
+        System.out.println("entered in validateToken");
+        String username = jwtService.extractUsername(token);
+        System.out.println();
+        if (username != null) {
+            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+            if (jwtService.validateToken(token, userDetails)) {
+                System.out.println("Entered in if loop");
+                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(userDetails, null,userDetails.getAuthorities());
+                System.out.println("After UsernamePasswordAuthenticationToken");
+                System.out.println("After authtoken");
+                SecurityContextHolder.getContext().setAuthentication(authToken);
+                return true; // Token is valid
+            }
+        }
+        // Token is invalid or expired, throw ExpiredJwtException
+        throw new ExpiredJwtException(null, null, "Token has expired in validate token");
+    }
+
+CustomerRabbitMQConfig: This class is a Spring configuration class annotated with @Configuration. It defines the RabbitMQ configuration for the customer service. Here's what it does:
+Declares constants for exchange name, routing key, and queue name.
+Defines a bean for creating a queue (customerOrderQueue()).
+Defines a bean for message converter (converter()) using Jackson for JSON conversion.
+Defines a bean for creating a topic exchange (exchange()).
+Defines a binding between the queue and the exchange (bindingCustomerServiceQueue()).
+CustomerServiceController: This class is a Spring @RestController responsible for handling HTTP POST requests related to customer orders. Here's what it does:
+Autowires a RabbitTemplate instance to send messages to RabbitMQ.
+Defines a method customerOrderRequest() annotated with @PostMapping to handle customer order requests. It takes a CustomerRequest object as input, converts it to JSON, and sends it to the RabbitMQ exchange with the specified routing key.
+CustomerRequest (model): This class represents the structure of a customer request. It has fields for customerName, customerCity, and customerMobile, along with getters and setters.
+OrderServiceRabbitMQConfig: This class is another Spring configuration class annotated with @Configuration. It defines the RabbitMQ configuration for the order service. Here's what it does:
+Defines a bean for message converter (converter()), similar to the CustomerRabbitMQConfig class.
+OrderRepository: This interface extends JpaRepository and defines methods to perform CRUD operations on the database table for storing customer orders.
+CustomerRequest (model): This class is duplicated and exists in both com.rabbitMq.customerService.model and com.rabbitMq.orderService.model packages. It represents the structure of a customer request. It is annotated with JPA annotations (@Entity, @Table, @Id, @Column) in the orderService package to be persisted in the database.
+OrderService: This class is a Spring service (@Service) responsible for handling business logic related to customer orders. It has a method saveCustomerRequest() that saves a CustomerRequest object to the database using the OrderRepository.
+orderServiceConsumer: This class is a Spring component (@Component) responsible for consuming messages from the RabbitMQ queue. It listens to the queue specified in OrderServiceRabbitMQConfig and processes messages using the consumerCustomerOrderServiceQueue() method. It prints the received customer details and then saves them using the OrderService.
+Overall, this code sets up communication between two Spring services (customerService and orderService) using RabbitMQ for message passing and a database for persistence. When a customer order request is received by the CustomerServiceController, it sends the request as a message to RabbitMQ. The orderServiceConsumer listens to this message, processes it, and saves it to the database using the OrderService.
